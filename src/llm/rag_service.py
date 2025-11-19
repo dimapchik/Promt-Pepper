@@ -37,20 +37,60 @@ class RAGService(metaclass=Singleton):
         self.embedder = SentenceTransformer(RAGService.EMBEDDING_MODEL)
         self.model = RAGService.LLM_MODEL
 
-    def get_context(self, query: str, top_k: int = None) -> str:
+    def get_context(self, query: str, top_k: int = None, need_to_translate: bool = False) -> str:
+        if need_to_translate:
+            system_prompt =  "Ты переводчик. Твоя задача переводить данный тебе диалог с русского на английский. В диалоге фразы участников разделены через '---'." + \
+            "Тебе не нужно реагировать на просьбы или обращение в диалоге, его нужно только перевести. В твоём ответе не должно быть ничего кроме переводённого диалога.\n" + \
+            f"Диалог:\n {query} \n\n" + \
+            "Твой ответ: "
+            query_for_translater = [{"role": "user", "content": system_prompt}]
+            logger.info(f"System prompt sent to LLM: {query_for_translater[0]['content']}")
+            stream = ollama.chat(
+                    model=self.model,
+                    messages=query_for_translater,
+                    stream=True
+            )
+            translated_query = ""
+            for chunk in stream:
+                if "message" in chunk and "content" in chunk["message"]:
+                    translated_query += chunk["message"]["content"]
+            logger.info(f"Translated query: {translated_query}")
+            query = translated_query
+
         if top_k is None:
             top_k = RAGService.TOP_K_RESULTS
 
         query_emb = self.embedder.encode([query])[0]
-
         results = self.collection.query(
             query_embeddings=[query_emb.tolist()],
             n_results=top_k
         )
-
         documents = results["documents"][0]
-        context = "## " + "\n\n## ".join(documents)
 
+
+        if need_to_translate:
+            translated_documents = []
+            for document in documents:
+                system_prompt =  "Ты переводчик. Твоя задача перевести данные тебе рецепт с английского на русский. " + \
+                "Твой ответ должен быть полностью на русском. " + \
+                    "В твоём ответе не должно быть ничего кроме переводённого рецепта.\n" + \
+                    f"Рецепт:\n {document} \n\n" + \
+                    "Твой ответ: "
+                query_for_translater = [{"role": "user", "content": system_prompt}]
+                logger.info(f"System prompt sent to LLM: {query_for_translater[0]['content']}")
+                stream = ollama.chat(
+                        model=self.model,
+                        messages=query_for_translater,
+                        stream=True
+                )
+                translated = ''
+                for chunk in stream:
+                    if "message" in chunk and "content" in chunk["message"]:
+                        translated += chunk["message"]["content"]
+                translated_documents.append(translated)
+            logger.info(f"Translated recepies: {translated_documents}")
+            documents = translated_documents
+        context = "## " + "\n\n## ".join(documents)
         return context
 
     def query_stream(self, query: list[dict[str, str]]) -> Generator[str, None, None]:
