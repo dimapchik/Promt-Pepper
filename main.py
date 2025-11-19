@@ -1,9 +1,15 @@
-import telebot
-from telebot import types
-from send_requests import SendExec
 import os
 
+import telebot
+
+from telebot import types
+from dotenv import load_dotenv
+
+from src.send_requests import SendExec
+from src.llm import setup_database
+
 # Рекомендую хранить токен в env: export BOT_TOKEN="..."
+load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("No BOT_TOKEN provided in environment variables")
@@ -32,6 +38,7 @@ def help_request(message):
         "❓ Доступные команды:\n"
         "/myfridges — показать твои холодильники\n"
         "/help — помощь\n"
+        "/clear - очистить историю диалога с нейросетью"
     )
 
 
@@ -39,6 +46,11 @@ def help_request(message):
 @bot.message_handler(commands=['myfridges'])
 def my_fridges(message):
     my_send.show_fridges_buttons(message)
+
+
+@bot.message_handler(commands=['clear'])
+def clear_conversation(message):
+    my_send.clear_conversation(message)
 
 
 # --- Callback handler: выбор холодильника ---
@@ -54,7 +66,7 @@ def fridge_action(call):
 
 
 # --- Flow добавления / удаления продуктов ---
-@bot.message_handler(func=lambda m: True)
+@bot.message_handler(func=lambda m: True, content_types=['text'])
 def default_handler(message):
     my_send.handle_text_response(message)
 
@@ -74,5 +86,6 @@ def confirm_delete(call):
     my_send.handle_confirm_delete(call)
 
 
+setup_database()
 print("✅ Bot is running...")
-bot.polling(none_stop=True)
+bot.infinity_polling(allowed_updates=['message', 'callback_query'])

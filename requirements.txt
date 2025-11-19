@@ -1,4 +1,15 @@
-datasets==4.2.0
-chromadb==1.3.4
-ollama==0.6.0
+# LLM and RAG dependencies
+datasets==4.4.1
 sentence-transformers==5.1.2
+chromadb==1.3.4
+ollama==0.6.1
+
+# Telegram bot
+aiogram==3.22.0
+
+# Utilities
+python-dotenv==1.2.1
+tqdm==4.67.1
+loguru==0.7.3
+
+kagglehub[pandas-datasets]

@@ -1,5 +1,9 @@
-from api_requests import ApiExec
+import json
+
 from telebot import types
+
+from src.api_requests import ApiExec
+from src.llm import RAGService
 
 
 class SendExec:
@@ -26,6 +30,7 @@ class SendExec:
     # --- Callback: выбрать холодильник ---
     def handle_fridge_selection(self, call):
         fridge_id = call.data.split("_", 1)[1]
+        self.user_states[call.from_user.id] = {"fridge_id": fridge_id}
         user = call.from_user.username
 
         if not self.my_api.check_admin(fridge_id, user):
@@ -99,10 +104,11 @@ class SendExec:
         user_id = message.from_user.id
         state = self.user_states.get(user_id)
         if not state:
+            self.chat_with_llm(message, None)
             return
 
-        action = state["action"]
-        step = state["step"]
+        action = state.get("action")
+        step = state.get("step")
         fridge_id = state.get("fridge_id")
 
         # --- новый холодильник ---
@@ -111,7 +117,7 @@ class SendExec:
                 name = message.text.strip()
                 result = self.my_api.create_fridge(name, message.from_user.username)
                 self.my_api.bot.send_message(message.chat.id, result)
-                del self.user_states[user_id]
+                self.user_states[user_id] = {"fridge_id": fridge_id}
                 return
 
         # --- добавление продукта ---
@@ -127,17 +133,20 @@ class SendExec:
                     self.my_api.bot.send_message(message.chat.id, "❗ Нужно число.")
                     return
                 state["step"] = "unit"
-                self.my_api.bot.send_message(message.chat.id, "✍️ Введи единицу измерения (шт, кг, л...) или оставь пустым:")
+                self.my_api.bot.send_message(
+                    message.chat.id, "✍️ Введи единицу измерения (шт, кг, л...) или оставь пустым:")
             elif step == "unit":
                 state["data"]["unit"] = message.text.strip() or "шт"
                 state["step"] = "expires"
                 self.my_api.bot.send_message(message.chat.id, "✍️ Введи срок годности (YYYY-MM-DD) или оставь пустым:")
             elif step == "expires":
+                # ! Как можно оставить пустым???
                 state["data"]["expires"] = message.text.strip() or None
+                # Чзх сверху
                 d = state["data"]
                 result = self.my_api.add_product(fridge_id, d["name"], d["quantity"], d["unit"], d["expires"])
                 self.my_api.bot.send_message(message.chat.id, result)
-                del self.user_states[user_id]
+                self.user_states[user_id] = {"fridge_id": fridge_id}
 
         # --- удаление продукта ---
         elif action == "remove":
@@ -154,4 +163,73 @@ class SendExec:
                 name = state["data"]["name"]
                 result = self.my_api.remove_product(fridge_id, name, qty)
                 self.my_api.bot.send_message(message.chat.id, result)
-                del self.user_states[user_id]
+                self.user_states[user_id] = {"fridge_id": fridge_id}
+
+        else:
+            self.chat_with_llm(message, fridge_id)
+
+    def chat_with_llm(self, message, fridge_id):
+        response = self.my_api.bot.send_message(message.chat.id, "⏳ Думаю...")
+        user_id = message.from_user.id
+        if fridge_id:
+            product_list = self.my_api.get_list(fridge_id)
+        else:
+            product_list = "❌ Пользователь не указал холодильник. " + \
+                           "Если информация о содержимом необходима, попроси пользователя *выбрать холодильник* " + \
+                           "(у него есть такая опция) или описать их самостоятельно."
+        convo = self.my_api.get_conversation(user_id)
+
+        current_msg = [{"role": "user", "content": message.text}]
+        self.my_api.add_to_conversation(user_id, "user", message.text)
+
+        temp_system = []
+        if not product_list.startswith("❌"):
+            temp_system = [{"role": "system", "content": "Содержимое холодильника: \n" + product_list}]
+        recipes_prompt = "\n---\n".join([m["content"] for m in convo + current_msg])
+        # print(recipes_prompt)
+        recipes = RAGService().get_context(recipes_prompt)
+
+        system_prompt = "Ты — кулинарных помощник, который отвечает на вопросы о рецептах. " + \
+                        "Всегда отвечай полностью на русском, переводя названия блюд. " + \
+                        "Не давай никаких рекомендаций, кроме кулинарных.\n\n" + \
+                        "Чтобы ответ был более точным, используй следующую информацию:\n\n" + \
+                        "# Содержимое холодильника пользователя:\n" + product_list + "\n\n" + \
+                        "# Релевантные рецепты:\n" + recipes + "\n\n"
+        system_prompt = [{"role": "system", "content": system_prompt}]
+
+        full_conversation = system_prompt + convo + current_msg
+
+        full_response = ""
+        chunk_buffer = ""
+        for chunk in RAGService().query_stream(full_conversation):
+            full_response += chunk
+            chunk_buffer += chunk
+
+            if len(chunk_buffer) >= 50:
+                try:
+                    self.my_api.bot.edit_message_text(
+                        chat_id=response.chat.id,
+                        message_id=response.message_id,
+                        text=full_response
+                    )
+                    chunk_buffer = ""
+                except Exception:
+                    pass
+
+        try:
+            if chunk_buffer:
+                self.my_api.bot.edit_message_text(
+                    chat_id=response.chat.id,
+                    message_id=response.message_id,
+                    text=full_response
+                )
+        except Exception:
+            pass
+
+        self.my_api.add_to_conversation(user_id, "assistant", full_response)
+        # print("✓ Response sent to user.")
+
+    def clear_conversation(self, message):
+        user_id = message.from_user.id
+        result = self.my_api.clear_conversation(user_id)
+        self.my_api.bot.send_message(message.chat.id, result)

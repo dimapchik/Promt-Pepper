@@ -1,8 +1,10 @@
 import json
-from pathlib import Path
+from copy import deepcopy
 from datetime import datetime
+from pathlib import Path
 
-FRIDGE_FILE = Path("/home/d1m4p/fridge/src/fridges.json")
+
+FRIDGE_FILE = Path("./fridges.json")
 
 
 class ApiExec:
@@ -14,7 +16,7 @@ class ApiExec:
         if FRIDGE_FILE.exists():
             with open(FRIDGE_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        return {"fridges": {}}
+        return {"fridges": {}, "conversations": {}}
 
     def save_data(self):
         with open(FRIDGE_FILE, "w", encoding="utf-8") as f:
@@ -129,3 +131,23 @@ class ApiExec:
         self.save_data()
         return f"❌ Холодильник «{fridge['name']}» удалён."
 
+    def get_conversation(self, user_id: str) -> list[dict[str, str]]:
+        user_id = str(user_id)
+        if user_id not in self.data["conversations"]:
+            self.data["conversations"][user_id] = []
+            self.save_data()
+        return deepcopy(self.data["conversations"][user_id])
+
+    def clear_conversation(self, user_id: str) -> str:
+        user_id = str(user_id)
+        self.data["conversations"][user_id] = []
+        self.save_data()
+        return "История диалога очищена."
+    
+    def add_to_conversation(self, user_id: str, role: str, message: str) -> str:
+        user_id = str(user_id)
+        if user_id not in self.data["conversations"]:
+            self.data["conversations"][user_id] = []
+        self.data["conversations"][user_id].append({"role": role, "content": message})
+        self.save_data()
+        return "Сообщения добавлены в историю диалога."
