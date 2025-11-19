@@ -74,7 +74,7 @@ class RAGService(metaclass=Singleton):
         )
         documents = results["documents"][0]
 
-
+        need_to_translate = False
         if need_to_translate:
             translated_documents = []
             for document in documents:

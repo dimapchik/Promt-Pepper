@@ -1,6 +1,7 @@
 import json
 
 from telebot import types
+from loguru import logger
 
 from src.api_requests import ApiExec
 from src.llm import RAGService
@@ -11,7 +12,7 @@ class SendExec:
         self.my_api = ApiExec(bot)
         self.user_states = {}  # {user_id: {step, fridge_id, action, data}}
 
-    def escape_markdown(text: str) -> str:
+    def escape_markdown(self, text: str) -> str:
         escape_chars = {
             '(': '\\(',
             ')': '\\)',
@@ -238,18 +239,19 @@ class SendExec:
                         text=full_response
                     )
                     chunk_buffer = ""
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.error(f"Error editing message: {e}")
 
         try:
-            escaped_response = escape_markdown(full_response)
+            escaped_response = self.escape_markdown(full_response)
             self.my_api.bot.edit_message_text(
                 chat_id=response.chat.id,
                 message_id=response.message_id,
                 text=escaped_response,
                 parse_mode='MarkdownV2'
             )
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error finalizing message: {e}")
             self.my_api.bot.edit_message_text(
                 chat_id=response.chat.id,
                 message_id=response.message_id,
