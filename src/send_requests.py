@@ -12,29 +12,29 @@ class SendExec:
         self.user_states = {}  # {user_id: {step, fridge_id, action, data}}
 
     def escape_markdown(text: str) -> str:
-    escape_chars = {
-        '(': '\\(',
-        ')': '\\)',
-        '[': '\\[',
-        ']': '\\]',
-        '{': '\\{',
-        '}': '\\}',
-        '~': '\\~',
-        '`': '\\`',
-        '>': '\\>',
-        '-': '\\-',
-        '=': '\\=',
-        '+': '\\+',
-        '.': '\\.',
-        '!': '\\!',
-    }
+        escape_chars = {
+            '(': '\\(',
+            ')': '\\)',
+            '[': '\\[',
+            ']': '\\]',
+            '{': '\\{',
+            '}': '\\}',
+            '~': '\\~',
+            '`': '\\`',
+            '>': '\\>',
+            '-': '\\-',
+            '=': '\\=',
+            '+': '\\+',
+            '.': '\\.',
+            '!': '\\!',
+        }
 
-    text = text.replace('**', '<NeedToPutStars>')
-    text = text.replace('* ', '• ')
-    text = text.replace('<NeedToPutStars>', '*')
-    for char, escaped_char in escape_chars.items():
-        text = text.replace(char, escaped_char)
-    return text
+        text = text.replace('**', '<NeedToPutStars>')
+        text = text.replace('* ', '• ')
+        text = text.replace('<NeedToPutStars>', '*')
+        for char, escaped_char in escape_chars.items():
+            text = text.replace(char, escaped_char)
+        return text
 
     # --- Показать холодильники + кнопки "новый/удалить" ---
     def show_fridges_buttons(self, message):

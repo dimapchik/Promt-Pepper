@@ -8,12 +8,19 @@ from dotenv import load_dotenv
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 
-from llm.conversation_state import Storage
-from llm.utils import Singleton
 
 logger.remove()
 logger.add(sys.stdout, level="INFO")
 load_dotenv()
+
+
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
 
 class RAGService(metaclass=Singleton):
