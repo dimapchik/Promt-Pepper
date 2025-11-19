@@ -60,7 +60,7 @@ class ApiExec:
 
         return "\n".join(lines)
 
-    def add_product(self, fridge_id: str, name: str, quantity: int, unit: str = "шт", expires: str = None):
+    def add_product(self, fridge_id: str, name: str, quantity: int, unit: str = "шт", expires: str = "-"):
         fridge = self.data["fridges"].get(fridge_id)
         if not fridge:
             return f"Холодильник {fridge_id} не найден."
