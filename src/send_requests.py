@@ -156,15 +156,15 @@ class SendExec:
                 try:
                     state["data"]["quantity"] = int(message.text.strip())
                 except ValueError:
-                    self.my_api.bot.send_message(message.chat.id, "❗ Нужно число.")
+                    self.my_api.bot.send_message(message.chat.id, "❗ Нужно целое число.")
                     return
                 state["step"] = "unit"
                 self.my_api.bot.send_message(
-                    message.chat.id, "✍️ Введи единицу измерения (шт, кг, л...) или оставь пустым:")
+                    message.chat.id, "✍️ Введи единицу измерения (шт, кг, л...) или поставьте \"-\":")
             elif step == "unit":
                 state["data"]["unit"] = message.text.strip() or "шт"
                 state["step"] = "expires"
-                self.my_api.bot.send_message(message.chat.id, "✍️ Введи срок годности (YYYY-MM-DD) или оставь пустым:")
+                self.my_api.bot.send_message(message.chat.id, "✍️ Введи срок годности (YYYY-MM-DD) или поставьте \"-\":")
             elif step == "expires":
                 # ! Как можно оставить пустым???
                 state["data"]["expires"] = message.text.strip() or None
@@ -184,7 +184,7 @@ class SendExec:
                 try:
                     qty = int(message.text.strip())
                 except ValueError:
-                    self.my_api.bot.send_message(message.chat.id, "❗ Нужно число.")
+                    self.my_api.bot.send_message(message.chat.id, "❗ Нужно целое число.")
                     return
                 name = state["data"]["name"]
                 result = self.my_api.remove_product(fridge_id, name, qty)
