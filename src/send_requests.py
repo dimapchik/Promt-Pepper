@@ -11,6 +11,31 @@ class SendExec:
         self.my_api = ApiExec(bot)
         self.user_states = {}  # {user_id: {step, fridge_id, action, data}}
 
+    def escape_markdown(text: str) -> str:
+    escape_chars = {
+        '(': '\\(',
+        ')': '\\)',
+        '[': '\\[',
+        ']': '\\]',
+        '{': '\\{',
+        '}': '\\}',
+        '~': '\\~',
+        '`': '\\`',
+        '>': '\\>',
+        '-': '\\-',
+        '=': '\\=',
+        '+': '\\+',
+        '.': '\\.',
+        '!': '\\!',
+    }
+
+    text = text.replace('**', '<NeedToPutStars>')
+    text = text.replace('* ', '• ')
+    text = text.replace('<NeedToPutStars>', '*')
+    for char, escaped_char in escape_chars.items():
+        text = text.replace(char, escaped_char)
+    return text
+
     # --- Показать холодильники + кнопки "новый/удалить" ---
     def show_fridges_buttons(self, message):
         user = message.from_user.username
@@ -187,10 +212,10 @@ class SendExec:
             temp_system = [{"role": "system", "content": "Содержимое холодильника: \n" + product_list}]
         recipes_prompt = "\n---\n".join([m["content"] for m in convo + current_msg])
         # print(recipes_prompt)
-        recipes = RAGService().get_context(recipes_prompt)
+        recipes = RAGService().get_context(recipes_prompt, need_to_translate=True)
 
         system_prompt = "Ты — кулинарных помощник, который отвечает на вопросы о рецептах. " + \
-                        "Всегда отвечай полностью на русском, переводя названия блюд. " + \
+                        "Всегда отвечай полностью на русском. " + \
                         "Не давай никаких рекомендаций, кроме кулинарных.\n\n" + \
                         "Чтобы ответ был более точным, используй следующую информацию:\n\n" + \
                         "# Содержимое холодильника пользователя:\n" + product_list + "\n\n" + \
@@ -217,14 +242,19 @@ class SendExec:
                     pass
 
         try:
-            if chunk_buffer:
-                self.my_api.bot.edit_message_text(
-                    chat_id=response.chat.id,
-                    message_id=response.message_id,
-                    text=full_response
-                )
+            escaped_response = escape_markdown(full_response)
+            self.my_api.bot.edit_message_text(
+                chat_id=response.chat.id,
+                message_id=response.message_id,
+                text=escaped_response,
+                parse_mode='MarkdownV2'
+            )
         except Exception:
-            pass
+            self.my_api.bot.edit_message_text(
+                chat_id=response.chat.id,
+                message_id=response.message_id,
+                text="Произошла ошибка, попробуйте повторить запрос"
+            )
 
         self.my_api.add_to_conversation(user_id, "assistant", full_response)
         # print("✓ Response sent to user.")
