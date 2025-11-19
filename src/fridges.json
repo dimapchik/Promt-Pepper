@@ -1,0 +1,63 @@
+{
+  "fridges": {
+    "fridge_1": {
+      "name": "home",
+      "owners": [
+        "d1m4p"
+      ],
+      "products": [
+        {
+          "id": 1,
+          "name": "Молоко",
+          "quantity": 1,
+          "unit": "литр",
+          "expires": "2025-09-20"
+        },
+        {
+          "id": 2,
+          "name": "Яйца",
+          "quantity": 34,
+          "unit": "шт",
+          "expires": null
+        },
+        {
+          "id": 3,
+          "name": "кола",
+          "quantity": 2,
+          "unit": "л",
+          "expires": "2025-10-10"
+        },
+        {
+          "id": 5,
+          "name": "лайм",
+          "quantity": 1,
+          "unit": "шт",
+          "expires": "2025-10-10"
+        }
+      ]
+    },
+    "fridge_2": {
+      "name": "Аня",
+      "owners": [
+        "annodomini704",
+        "d1m4p"
+      ],
+      "products": [
+        {
+          "id": 1,
+          "name": "Яйца",
+          "quantity": 9,
+          "unit": "шт",
+          "expires": null
+        }
+      ]
+    },
+    "fridge_4": {
+      "name": "zorge",
+      "owners": [
+        "d1m4p"
+      ],
+      "products": []
+    }
+  }
+}

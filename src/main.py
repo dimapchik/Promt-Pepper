@@ -1,0 +1,78 @@
+import telebot
+from telebot import types
+from send_requests import SendExec
+import os
+
+# Рекомендую хранить токен в env: export BOT_TOKEN="..."
+TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("No BOT_TOKEN provided in environment variables")
+
+bot = telebot.TeleBot(TOKEN)
+my_send = SendExec(bot)
+
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_myfridges = types.KeyboardButton('/myfridges')
+    btn_help = types.KeyboardButton('/help')
+    markup.add(btn_myfridges, btn_help)
+    bot.send_message(
+        message.chat.id,
+        "👋 Привет! Это твой Fridge Bot.\nВыбирай холодильник и управляй продуктами.",
+        reply_markup=markup
+    )
+
+
+@bot.message_handler(commands=['help'])
+def help_request(message):
+    bot.send_message(
+        message.chat.id,
+        "❓ Доступные команды:\n"
+        "/myfridges — показать твои холодильники\n"
+        "/help — помощь\n"
+    )
+
+
+# --- Шаг 1: показать холодильники ---
+@bot.message_handler(commands=['myfridges'])
+def my_fridges(message):
+    my_send.show_fridges_buttons(message)
+
+
+# --- Callback handler: выбор холодильника ---
+@bot.callback_query_handler(func=lambda call: call.data.startswith("fridge_"))
+def fridge_selected(call):
+    my_send.handle_fridge_selection(call)
+
+
+# --- Callback handler: выбрать действие для холодильника ---
+@bot.callback_query_handler(func=lambda call: call.data.startswith("action_"))
+def fridge_action(call):
+    my_send.handle_fridge_action(call)
+
+
+# --- Flow добавления / удаления продуктов ---
+@bot.message_handler(func=lambda m: True)
+def default_handler(message):
+    my_send.handle_text_response(message)
+
+# --- Callback: новый холодильник ---
+@bot.callback_query_handler(func=lambda call: call.data == "new_fridge")
+def new_fridge(call):
+    my_send.handle_new_fridge(call)
+
+# --- Callback: удалить холодильник ---
+@bot.callback_query_handler(func=lambda call: call.data == "delete_fridge")
+def delete_fridge(call):
+    my_send.handle_delete_fridge(call)
+
+# --- Callback: подтверждение удаления ---
+@bot.callback_query_handler(func=lambda call: call.data.startswith("removefridge_"))
+def confirm_delete(call):
+    my_send.handle_confirm_delete(call)
+
+
+print("✅ Bot is running...")
+bot.polling(none_stop=True)
