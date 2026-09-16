@@ -1,3 +1,4 @@
+import asyncio
 import json
 from copy import deepcopy
 from datetime import datetime
@@ -10,17 +11,20 @@ FRIDGE_FILE = Path("./fridges.json")
 class ApiExec:
     def __init__(self, bot):
         self.bot = bot
-        self.data = self.load_data()
+        self.data = self._load_data_sync()
 
-    def load_data(self):
+    def _load_data_sync(self):
         if FRIDGE_FILE.exists():
             with open(FRIDGE_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {"fridges": {}, "conversations": {}}
 
-    def save_data(self):
+    def _save_data_sync(self):
         with open(FRIDGE_FILE, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=2, ensure_ascii=False)
+
+    async def save_data(self):
+        await asyncio.to_thread(self._save_data_sync)
 
     def get_name(self, fridge_id: str):
         return self.data["fridges"].get(fridge_id)["name"]
@@ -60,23 +64,21 @@ class ApiExec:
 
         return "\n".join(lines)
 
-    def add_product(self, fridge_id: str, name: str, quantity: int, unit: str = "шт", expires: str = "-"):
+    async def add_product(self, fridge_id: str, name: str, quantity: int, unit: str = "шт", expires: str = "-"):
         fridge = self.data["fridges"].get(fridge_id)
         if not fridge:
             return f"Холодильник {fridge_id} не найден."
 
         products = fridge.setdefault("products", [])
 
-        # Проверка: если продукт уже есть → обновляем количество
         for p in products:
             if p["name"].lower() == name.lower():
                 p["quantity"] += quantity
-                if expires:  # обновим срок годности, если пришёл
+                if expires:
                     p["expires"] = expires
-                self.save_data()
+                await self.save_data()
                 return f"Добавлено {quantity} {unit} к {name}. Теперь всего: {p['quantity']}."
 
-        # Новый продукт
         new_id = max((p["id"] for p in products), default=0) + 1
         products.append({
             "id": new_id,
@@ -85,10 +87,10 @@ class ApiExec:
             "unit": unit,
             "expires": expires
         })
-        self.save_data()
+        await self.save_data()
         return f"{name} добавлен в холодильник {fridge['name']}."
 
-    def remove_product(self, fridge_id: str, name: str, quantity: int):
+    async def remove_product(self, fridge_id: str, name: str, quantity: int):
         fridge = self.data["fridges"].get(fridge_id)
         if not fridge:
             return f"Холодильник {fridge_id} не найден."
@@ -99,11 +101,11 @@ class ApiExec:
             if p["name"].lower() == name.lower():
                 if p["quantity"] <= quantity:
                     products.remove(p)
-                    self.save_data()
+                    await self.save_data()
                     return f"{name} полностью удалён из холодильника."
                 else:
                     p["quantity"] -= quantity
-                    self.save_data()
+                    await self.save_data()
                     return f"Удалено {quantity} из {name}. Осталось {p['quantity']}."
 
         return f"{name} не найден в холодильнике."
@@ -113,41 +115,41 @@ class ApiExec:
         if not fridge:
             return False
         return user in fridge.get("owners")
-    
-    def create_fridge(self, name: str, owner: str):
+
+    async def create_fridge(self, name: str, owner: str):
         fridges = self.data["fridges"]
         new_id = f"fridge_{len(fridges) + 1}"
         fridges[new_id] = {"name": name, "owners": [owner], "products": []}
-        self.save_data()
+        await self.save_data()
         return f"🆕 Холодильник «{name}» создан (ID: {new_id})"
 
-    def remove_fridge(self, fridge_id: str, user: str):
+    async def remove_fridge(self, fridge_id: str, user: str):
         fridge = self.data["fridges"].get(fridge_id)
         if not fridge:
             return f"❌ Холодильник {fridge_id} не найден."
         if user not in fridge.get("owners"):
             return "❌ Только владелец может удалить холодильник."
         del self.data["fridges"][fridge_id]
-        self.save_data()
+        await self.save_data()
         return f"❌ Холодильник «{fridge['name']}» удалён."
 
-    def get_conversation(self, user_id: str) -> list[dict[str, str]]:
+    async def get_conversation(self, user_id: str) -> list[dict[str, str]]:
         user_id = str(user_id)
         if user_id not in self.data["conversations"]:
             self.data["conversations"][user_id] = []
-            self.save_data()
+            await self.save_data()
         return deepcopy(self.data["conversations"][user_id])
 
-    def clear_conversation(self, user_id: str) -> str:
+    async def clear_conversation(self, user_id: str) -> str:
         user_id = str(user_id)
         self.data["conversations"][user_id] = []
-        self.save_data()
+        await self.save_data()
         return "История диалога очищена."
-    
-    def add_to_conversation(self, user_id: str, role: str, message: str) -> str:
+
+    async def add_to_conversation(self, user_id: str, role: str, message: str) -> str:
         user_id = str(user_id)
         if user_id not in self.data["conversations"]:
             self.data["conversations"][user_id] = []
         self.data["conversations"][user_id].append({"role": role, "content": message})
-        self.save_data()
+        await self.save_data()
         return "Сообщения добавлены в историю диалога."
